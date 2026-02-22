@@ -1,55 +1,40 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
+import Webcam from "react-webcam";
+import { Camera } from "lucide-react";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 
 export default function ScanPage() {
   const router = useRouter();
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const webcamRef = useRef<Webcam>(null);
+
   const [scanning, setScanning] = useState(false);
   const [history, setHistory] = useState<{ time: string }[]>([]);
 
-  // Start camera on mobile when scanning
-  useEffect(() => {
-    let stream: MediaStream;
-    const startCamera = async () => {
-      try {
-        if (scanning && videoRef.current) {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment" }, // back camera
-          });
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-        }
-      } catch (err) {
-        console.error("Camera access denied:", err);
-        setScanning(false);
-      }
-    };
-
-    startCamera();
-
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, [scanning]);
-
   const startScan = () => {
     setScanning(true);
-    setHistory((prev) => [
-      { time: new Date().toLocaleTimeString() },
-      ...prev,
-    ]);
+
+    // Capture one frame after scan
+    setTimeout(() => {
+      if (webcamRef.current) {
+        const imageSrc = webcamRef.current.getScreenshot(); // base64 image
+        console.log("Captured image:", imageSrc);
+        setHistory((prev) => [
+          { time: new Date().toLocaleTimeString() },
+          ...prev,
+        ]);
+      }
+      setScanning(false);
+    }, 2000); // simulate 2s scanning delay
   };
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center py-10">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center">
-        
-        {/* Header with Back Button */}
+
+        {/* Header */}
         <div className="w-full flex items-center mb-6">
           <button
             onClick={() => router.back()}
@@ -62,33 +47,32 @@ export default function ScanPage() {
           </h1>
         </div>
 
-        {/* Camera / Scan Area */}
-        <div className="w-full h-64 bg-gray-200 rounded-2xl flex items-center justify-center shadow-inner relative mb-6 overflow-hidden">
-          {!scanning && (
-            <p className="text-gray-400">Press the button to start camera scan</p>
-          )}
+        {/* Camera Preview */}
+        <div className="w-full h-64 bg-gray-100 rounded-2xl flex items-center justify-center shadow-inner relative mb-6 overflow-hidden">
+          <Webcam
+            ref={webcamRef}
+            audio={false}
+            screenshotFormat="image/jpeg"
+            videoConstraints={{ facingMode: "environment" }}
+            className="w-full h-full object-cover"
+          />
 
+          {/* Scanning overlay */}
           {scanning && (
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover rounded-2xl"
-              playsInline
-              muted
-            />
+            <div className="absolute inset-0 bg-green-600/20 flex items-center justify-center rounded-2xl">
+              <p className="text-white font-semibold text-lg">Scanning...</p>
+            </div>
           )}
         </div>
-
-        {/* Status Text */}
-        <p className={`text-base mb-6 ${scanning ? "text-yellow-600" : "text-green-600"}`}>
-          {scanning ? "Scanning with camera..." : "Idle"}
-        </p>
 
         {/* Scan Button */}
         <button
           onClick={startScan}
-          className="bg-green-600 p-6 rounded-full shadow-lg hover:scale-110 active:scale-95 transition transform relative overflow-hidden flex items-center justify-center"
+          disabled={scanning}
+          className="bg-green-600 p-6 rounded-full shadow-lg hover:scale-110 active:scale-95 transition transform relative overflow-hidden flex items-center justify-center disabled:opacity-50"
         >
-          <span className="text-white font-bold">SCAN</span>
+          <Camera size={32} className="text-white" />
+          <span className="absolute w-full h-full rounded-full bg-white opacity-10 animate-ping"></span>
         </button>
 
         {/* Scan History */}
