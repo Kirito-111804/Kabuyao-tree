@@ -1,42 +1,48 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Camera } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 
 export default function ScanPage() {
   const router = useRouter();
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [scanning, setScanning] = useState(false);
-  const [history, setHistory] = useState<{ time: string }[]>([]); // ✅ TypeScript fix
-  const [progress, setProgress] = useState(0);
+  const [history, setHistory] = useState<{ time: string }[]>([]);
 
-  // Simulate scanning progress
+  // Start camera on mobile when scanning
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (scanning) {
-      setProgress(0);
-      timer = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(timer);
-            setScanning(false);
-            // Add new scan to history
-            setHistory((prevHistory) => [
-              { time: new Date().toLocaleTimeString() },
-              ...prevHistory,
-            ]);
-            return 100;
-          }
-          return prev + 2;
-        });
-      }, 50);
-    }
-    return () => clearInterval(timer);
+    let stream: MediaStream;
+    const startCamera = async () => {
+      try {
+        if (scanning && videoRef.current) {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" }, // back camera
+          });
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+      } catch (err) {
+        console.error("Camera access denied:", err);
+        setScanning(false);
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
   }, [scanning]);
 
   const startScan = () => {
-    if (!scanning) setScanning(true);
+    setScanning(true);
+    setHistory((prev) => [
+      { time: new Date().toLocaleTimeString() },
+      ...prev,
+    ]);
   };
 
   return (
@@ -56,53 +62,33 @@ export default function ScanPage() {
           </h1>
         </div>
 
-        {/* Scan Area */}
-        <div className="w-full h-64 bg-gray-100 rounded-2xl flex items-center justify-center shadow-inner relative mb-6">
-          {!scanning && <Camera size={48} className="text-gray-400" />}
+        {/* Camera / Scan Area */}
+        <div className="w-full h-64 bg-gray-200 rounded-2xl flex items-center justify-center shadow-inner relative mb-6 overflow-hidden">
+          {!scanning && (
+            <p className="text-gray-400">Press the button to start camera scan</p>
+          )}
 
           {scanning && (
-            <div className="absolute flex items-center justify-center">
-              {/* Circular progress */}
-              <svg className="w-16 h-16 animate-spin text-green-600" viewBox="0 0 50 50">
-                <circle
-                  className="opacity-25"
-                  cx="25"
-                  cy="25"
-                  r="20"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  fill="none"
-                />
-                <circle
-                  className="opacity-75"
-                  cx="25"
-                  cy="25"
-                  r="20"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  strokeDasharray="31.4 31.4"
-                  strokeLinecap="round"
-                  fill="none"
-                  style={{ strokeDashoffset: 31.4 - (progress / 100) * 31.4 }}
-                />
-              </svg>
-            </div>
+            <video
+              ref={videoRef}
+              className="w-full h-full object-cover rounded-2xl"
+              playsInline
+              muted
+            />
           )}
         </div>
 
         {/* Status Text */}
         <p className={`text-base mb-6 ${scanning ? "text-yellow-600" : "text-green-600"}`}>
-          {scanning ? "Scanning in progress..." : "Press the button to start scanning"}
+          {scanning ? "Scanning with camera..." : "Idle"}
         </p>
 
-        {/* Scan Button with Ripple / Scale effect */}
+        {/* Scan Button */}
         <button
           onClick={startScan}
           className="bg-green-600 p-6 rounded-full shadow-lg hover:scale-110 active:scale-95 transition transform relative overflow-hidden flex items-center justify-center"
         >
-          <Camera size={32} className="text-white" />
-          {/* Ripple Effect */}
-          <span className="absolute w-full h-full rounded-full bg-white opacity-10 animate-ping"></span>
+          <span className="text-white font-bold">SCAN</span>
         </button>
 
         {/* Scan History */}
